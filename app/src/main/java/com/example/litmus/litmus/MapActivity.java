@@ -137,14 +137,15 @@ public class MapActivity extends Activity {
 
 
 
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
 
-        Bundle extras = getIntent().getExtras();
-        if (extras != null) {
-            thisUser = new User(extras.getString("id"), extras.getString("name"));
-            Log.d("user", thisUser.id + thisUser.name);
-        }
+        // for testing:
+        Long tsLong = System.currentTimeMillis()/1000;
+        String ts = tsLong.toString();
+
+        thisUser = new User("id:" + ts, "User Name");
 
         graphicIdToDBRef = new HashMap<Integer, DataSnapshot>();
 
