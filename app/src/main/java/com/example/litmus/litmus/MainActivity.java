@@ -109,7 +109,12 @@ public class MainActivity extends AppCompatActivity {
 
         //Location eventlocation = new Location(45.4, 32.4, "YHack");
         //User creator = new User("creatorid", "James");
-        thisUser = new User("testuserid2", "TestUser2");
+
+        // for testing:
+        Long tsLong = System.currentTimeMillis()/1000;
+        String ts = tsLong.toString();
+
+        thisUser = new User("id:" + ts, "User Name");
 
 
 
