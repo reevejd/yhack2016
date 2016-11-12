@@ -13,7 +13,7 @@ tools:context="com.example.litmus.litmus.MapActivityMap">
     android:id="@+id/map"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
-    mapoptions.MapType="Topo"
+    mapoptions.MapType="Streets"
     mapoptions.center="41.3163, -72.9223"
     mapoptions.ZoomLevel="16"/>
 
