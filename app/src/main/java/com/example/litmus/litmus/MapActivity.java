@@ -241,7 +241,7 @@ public class MapActivity extends Activity {
                     return;
                 }
 
-                int thisPointId = graphicsLayer.getGraphicIDs(x, y, 20, 1)[0];
+                final int thisPointId = graphicsLayer.getGraphicIDs(x, y, 20, 1)[0];
                 Log.d("result", "" + thisPointId);
 
 
@@ -265,6 +265,21 @@ public class MapActivity extends Activity {
                                         public void onClick(DialogInterface dialog, int id) {
                                             // leave event
                                             locations.child(eventId).child("people").child(thisUser.id).removeValue();
+                                            locations.child(eventId).child("people").addListenerForSingleValueEvent(new ValueEventListener() {
+                                                @Override
+                                                public void onDataChange(DataSnapshot dataSnapshot) {
+                                                    if (dataSnapshot.exists()) {
+                                                        // do nothing
+                                                    } else {
+                                                        locations.child(eventId).removeValue();
+                                                    }
+                                                }
+
+                                                @Override
+                                                public void onCancelled(DatabaseError databaseError) {
+
+                                                }
+                                            });
                                         }
                                     });
 
