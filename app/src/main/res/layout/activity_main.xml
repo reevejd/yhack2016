@@ -17,9 +17,12 @@
         android:layout_below="@+id/button2"
         android:layout_marginTop="17dp"
         android:layout_centerHorizontal="true"
-        android:id="@+id/button3"
-        android:clickable="false"
-        android:alpha="0.5" />
+        android:onClick="createEventDialog"
+        android:id="@+id/button3"/>
+
+        <!--android:clickable="false"
+        android:alpha="0.5"  -->
+
 
     <Button
         android:text="Join Event"

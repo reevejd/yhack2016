@@ -1,7 +1,9 @@
 package com.example.litmus.litmus;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Menu;
@@ -50,10 +52,53 @@ public class MapActivity extends Activity {
     PopupContainer popupContainer;
 
 
+    public class User {
+        // going to need to handle user duplicates at some point
+        public String id;
+        public String name;
+        //public String[] friends;
+
+        public User() {
+
+        };
+
+        public User(String id, String name/*, String[] friends*/) {
+            this.id = id;
+            this.name = name;
+            //this.friends = friends;
+        }
+
+        private Map<String, Object> innerMap() {
+            HashMap<String, Object> result = new HashMap<>();
+            result.put("id", id);
+            result.put("name", name);
+
+            return result;
+        }
+
+        private Map<String, Object> toMap() {
+            HashMap<String, Object> result = new HashMap<>();
+            result.put(id, innerMap());
+
+            return result;
+        }
+    }
+
+    User thisUser;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
+
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
+
+        Bundle extras = getIntent().getExtras();
+        if (extras != null) {
+            thisUser = new User(extras.getString("id"), extras.getString("name"));
+            Log.d("user", thisUser.id + thisUser.name);
+        }
 
         graphicIdToDBRef = new HashMap<Integer, DataSnapshot>();
 
@@ -82,11 +127,13 @@ public class MapActivity extends Activity {
                     Double thisLocationLatitude = (Double) location.child("latitude").getValue();
                     Double thisLocationLongitude = (Double) location.child("longitude").getValue();
                     int attendees = 0;
+                    boolean joined = false;
                     for (DataSnapshot person : location.child("people").getChildren()) {
+                        if (person.getKey().equals(thisUser.id)) { joined = true; };
                         attendees++;
                         // get some data from these people later, to get who's present, demographics, etc.
                     }
-                    int[] ids = createPointOfInterest(thisLocationLatitude, thisLocationLongitude, thisLocationName, attendees);
+                    int[] ids = createPointOfInterest(thisLocationLatitude, thisLocationLongitude, thisLocationName, attendees, joined);
 
                     for (int thisId : ids) {
                         graphicIdToDBRef.put(thisId, location);
@@ -104,6 +151,10 @@ public class MapActivity extends Activity {
 
         //createPointOfInterest(41.3163, -72.9223, "Placeholder", 5);
 
+
+
+
+
         mMapView.setOnSingleTapListener(new OnSingleTapListener() {
             @Override
             public void onSingleTap(float x, float y) {
@@ -116,16 +167,109 @@ public class MapActivity extends Activity {
                 int thisPointId = graphicsLayer.getGraphicIDs(x, y, 200, 1)[0];
                 Log.d("result", "" + thisPointId);
 
-                String text = graphicIdToDBRef.get(thisPointId).child("name").getValue().toString();
+                final String eventName = graphicIdToDBRef.get(thisPointId).child("name").getValue().toString();
+                final String eventId = graphicIdToDBRef.get(thisPointId).getKey();
+                boolean joined;
+                locations.child(eventId).child("people").child(thisUser.id).addListenerForSingleValueEvent(new ValueEventListener() {
 
-                Context context = getApplicationContext();
-                Toast toast = Toast.makeText(context, text, LENGTH_SHORT);
-                toast.show();
+                    public void onDataChange(DataSnapshot dataSnapshot) {
+                        if (dataSnapshot.exists()) {
+                            AlertDialog.Builder builder1 = new AlertDialog.Builder(MapActivity.this);
+                            builder1.setMessage("Leave this event?");
+                            builder1.setTitle(eventName);
+                            builder1.setCancelable(true);
+
+                            builder1.setPositiveButton(
+                                    "Yes",
+                                    new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface dialog, int id) {
+                                            // leave event
+                                            locations.child(eventId).child("people").child(thisUser.id).removeValue();
+                                        }
+                                    });
+
+                            builder1.setNegativeButton(
+                                    "No",
+                                    new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface dialog, int id) {
+                                            dialog.cancel();
+                                        }
+                                    }
+                            );
+
+                            AlertDialog eventAlert = builder1.create();
+                            eventAlert.show();
+                        } else {
+                            AlertDialog.Builder builder1 = new AlertDialog.Builder(MapActivity.this);
+                            builder1.setMessage("Join this event?");
+                            builder1.setTitle(eventName);
+                            builder1.setCancelable(true);
+
+                            builder1.setPositiveButton(
+                                    "Yes",
+                                    new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface dialog, int id) {
+                                            //join event
+                                            AttemptJoinEvent(eventId);
+
+                                        }
+                                    });
+
+                            builder1.setNegativeButton(
+                                    "No",
+                                    new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface dialog, int id) {
+                                            dialog.cancel();
+                                        }
+                                    }
+                            );
+
+                            AlertDialog eventAlert = builder1.create();
+                            eventAlert.show();
+                        }
+                    }
+
+                    @Override
+                    public void onCancelled(DatabaseError databaseError) {
+
+                    }
+                });
+
+
+                //Context context = getApplicationContext();
+                //Toast toast = Toast.makeText(context, text, LENGTH_SHORT);
+                //toast.show();
 
             }
         });
     }
 
+    protected void AttemptJoinEvent(final String eventId) {
+
+        locations.child(eventId).child("people").child(thisUser.id).addListenerForSingleValueEvent(new ValueEventListener() {
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                if (dataSnapshot.exists()) {
+                    //already joined!
+                    Toast toast = Toast.makeText(MapActivity.this, "You've already joined this event!", LENGTH_SHORT);
+                    toast.show();
+
+                } else {
+                    joinEvent(thisUser, eventId);
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+    };
+
+    protected void joinEvent(final User joiner, String locationID) {
+        final DatabaseReference thisLocation = database.getReference("Locations").child(locationID).child("people");
+        thisLocation.updateChildren(joiner.toMap());
+    };
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -146,20 +290,28 @@ public class MapActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
-    protected int[] createPointOfInterest(Double latitude, Double longitude, String description, int population) {
-        int[] ids = new int[2];
+    protected int[] createPointOfInterest(Double latitude, Double longitude, String description, int population, boolean joined) {
+        int[] ids = new int[3];
 
         Log.d("POI", "entered point of interest creator");
         Point pnt = GeometryEngine.project(longitude, latitude, webSR);
 
+        if (joined) {
+            SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.BLACK, 45, SimpleMarkerSymbol.STYLE.CIRCLE);
+            Graphic graphic = new Graphic(pnt, sms);
+            ids[0] = graphicsLayer.addGraphic(graphic);
+        }
+
+
+
         SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.RED, 40, SimpleMarkerSymbol.STYLE.CIRCLE);
         Graphic graphic = new Graphic(pnt, sms);
-        ids[0] = graphicsLayer.addGraphic(graphic);
+        ids[1] = graphicsLayer.addGraphic(graphic);
 
 
         TextSymbol textSymbol = new TextSymbol(30, Integer.toString(population), Color.WHITE, HorizontalAlignment.CENTER, VerticalAlignment.MIDDLE);
         Graphic textGraphic = new Graphic(pnt, textSymbol);
-        ids[1] = graphicsLayer.addGraphic(textGraphic);
+        ids[2] = graphicsLayer.addGraphic(textGraphic);
 
         return ids;
     }
