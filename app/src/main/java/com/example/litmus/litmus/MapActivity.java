@@ -4,8 +4,10 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View.OnClickListener;
@@ -17,6 +19,7 @@ import com.esri.android.map.GraphicsLayer;
 import com.esri.android.map.MapView;
 import com.esri.android.map.event.OnSingleTapListener;
 import com.esri.android.map.popup.PopupContainer;
+import com.esri.android.toolkit.geocode.GeocodeHelper;
 import com.esri.core.geometry.GeometryEngine;
 import com.esri.core.geometry.Point;
 import com.esri.core.map.Graphic;
@@ -31,6 +34,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import android.view.View;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import java.util.HashMap;
@@ -84,6 +88,48 @@ public class MapActivity extends Activity {
         }
     }
 
+    public class Location {
+        public float latitude;
+        public float longitude;
+        public String name;
+        public String id;
+
+        public Location() {
+
+        };
+
+        public Location(float latitude, float longitude, String name) {
+
+            Long tsLong = System.currentTimeMillis()/1000;
+            String ts = tsLong.toString();
+
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.name = name;
+            this.id = name + ts;
+        };
+
+        // return
+
+        public Map<String, Object> toMap() {
+
+            HashMap<String, Object> result = new HashMap<>();
+            result.put(id, innerMap());
+
+            return result;
+        }
+
+        private Map<String, Object> innerMap() {
+            HashMap<String, Object> result = new HashMap<>();
+            result.put("latitude", latitude);
+            result.put("longitude", longitude);
+            result.put("name", name);
+            result.put("people", false);
+
+            return result;
+        }
+    }
+
     User thisUser;
 
     @Override
@@ -124,8 +170,8 @@ public class MapActivity extends Activity {
                 graphicsLayer.removeAll();
                 for (DataSnapshot location : snapshot.getChildren()) {
                     String thisLocationName = (String) location.child("name").getValue();
-                    Double thisLocationLatitude = (Double) location.child("latitude").getValue();
-                    Double thisLocationLongitude = (Double) location.child("longitude").getValue();
+                    double thisLocationLatitude = Double.parseDouble(location.child("latitude").getValue().toString());
+                    double thisLocationLongitude = Double.parseDouble(location.child("longitude").getValue().toString());
                     int attendees = 0;
                     boolean joined = false;
                     for (DataSnapshot person : location.child("people").getChildren()) {
@@ -157,15 +203,49 @@ public class MapActivity extends Activity {
 
         mMapView.setOnSingleTapListener(new OnSingleTapListener() {
             @Override
-            public void onSingleTap(float x, float y) {
+            public void onSingleTap(final float x, final float y) {
                 if (!mMapView.isLoaded()) {
                     return;
                 }
 
                 //Point identifyPoint = mMapView.toMapPoint(x, y);
+                if ((graphicsLayer.getGraphicIDs(x, y, 20, 1)).length == 0) {
+                    // there are no events nearby... create a new one?
+                    AlertDialog.Builder builder1 = new AlertDialog.Builder(MapActivity.this);
+                    builder1.setMessage("What's the event?");
+                    builder1.setTitle("Create Event");
+                    builder1.setCancelable(true);
 
-                int thisPointId = graphicsLayer.getGraphicIDs(x, y, 200, 1)[0];
+                    final EditText input = new EditText(MapActivity.this);
+                    input.setInputType(InputType.TYPE_CLASS_TEXT);
+                    builder1.setView(input);
+
+                    builder1.setPositiveButton(
+                            "Create Event",
+                            new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int id) {
+                                    //join event
+                                    Point p = mMapView.toMapPoint(x, y);
+                                    SpatialReference spacRef = SpatialReference.create(4326);
+                                    Point ltLn = (Point) GeometryEngine.project(p, mMapView.getSpatialReference(), spacRef);
+
+                                    String eventName = input.getText().toString();
+                                    Location thisLocation = new Location((float) ltLn.getY(), (float) ltLn.getX(), eventName);
+                                    createEvent(thisUser, thisLocation);
+
+                                }
+                            });
+
+                    AlertDialog eventAlert = builder1.create();
+                    eventAlert.show();
+                    return;
+                }
+
+                int thisPointId = graphicsLayer.getGraphicIDs(x, y, 20, 1)[0];
                 Log.d("result", "" + thisPointId);
+
+
+
 
                 final String eventName = graphicIdToDBRef.get(thisPointId).child("name").getValue().toString();
                 final String eventId = graphicIdToDBRef.get(thisPointId).getKey();
@@ -271,6 +351,17 @@ public class MapActivity extends Activity {
         thisLocation.updateChildren(joiner.toMap());
     };
 
+    protected void createEvent(final User creator, final Location location) {
+        final DatabaseReference locationsRef = database.getReference("Locations");
+        locationsRef.updateChildren(location.toMap(), new DatabaseReference.CompletionListener() {
+            @Override
+            public void onComplete(DatabaseError databaseError, DatabaseReference databaseReference) {
+                Log.e("update complete", "" + databaseReference);
+                locationsRef.child(location.id).child("people").updateChildren(creator.toMap());
+            }
+        });
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -290,7 +381,7 @@ public class MapActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
-    protected int[] createPointOfInterest(Double latitude, Double longitude, String description, int population, boolean joined) {
+    protected int[] createPointOfInterest(double latitude, double longitude, String description, int population, boolean joined) {
         int[] ids = new int[3];
 
         Log.d("POI", "entered point of interest creator");

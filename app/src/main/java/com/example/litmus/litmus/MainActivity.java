@@ -116,8 +116,6 @@ public class MainActivity extends AppCompatActivity {
 
         thisUser = new User("id:" + ts, "User Name");
 
-
-
     }
 
 
