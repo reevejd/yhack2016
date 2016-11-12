@@ -400,18 +400,20 @@ public class MapActivity extends Activity {
     protected int[] createPointOfInterest(double latitude, double longitude, String description, int population, boolean joined) {
         int[] ids = new int[3];
 
+        int scalingFactor = population/5;
+
         Log.d("POI", "entered point of interest creator");
         Point pnt = GeometryEngine.project(longitude, latitude, webSR);
 
         if (joined) {
-            SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.BLACK, 45, SimpleMarkerSymbol.STYLE.CIRCLE);
+            SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.BLACK, 45+10*scalingFactor, SimpleMarkerSymbol.STYLE.CIRCLE);
             Graphic graphic = new Graphic(pnt, sms);
             ids[0] = graphicsLayer.addGraphic(graphic);
         }
 
 
 
-        SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.RED, 40, SimpleMarkerSymbol.STYLE.CIRCLE);
+        SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.RED, 40+10*scalingFactor, SimpleMarkerSymbol.STYLE.CIRCLE);
         Graphic graphic = new Graphic(pnt, sms);
         ids[1] = graphicsLayer.addGraphic(graphic);
 
