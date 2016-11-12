@@ -1,15 +1,19 @@
 package com.example.litmus.litmus;
 
 import android.app.Activity;
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View.OnClickListener;
 import android.util.Log;
 import java.util.Map;
+import android.os.Parcelable;
 
 import com.esri.android.map.GraphicsLayer;
 import com.esri.android.map.MapView;
+import com.esri.android.map.event.OnSingleTapListener;
 import com.esri.android.map.popup.PopupContainer;
 import com.esri.core.geometry.GeometryEngine;
 import com.esri.core.geometry.Point;
@@ -25,14 +29,19 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import android.view.View;
+import android.widget.Toast;
 
 import java.util.HashMap;
+
+import static android.widget.Toast.LENGTH_LONG;
+import static android.widget.Toast.LENGTH_SHORT;
 
 public class MapActivity extends Activity {
 
     FirebaseDatabase database;
     DatabaseReference locations;
 
+    Map<Integer, DataSnapshot> graphicIdToDBRef;
 
 
     MapView mMapView;
@@ -45,6 +54,9 @@ public class MapActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
+
+        graphicIdToDBRef = new HashMap<Integer, DataSnapshot>();
+
         webSR = SpatialReference.create(3857);
 
 
@@ -74,7 +86,11 @@ public class MapActivity extends Activity {
                         attendees++;
                         // get some data from these people later, to get who's present, demographics, etc.
                     }
-                    createPointOfInterest(thisLocationLatitude, thisLocationLongitude, thisLocationName, attendees);
+                    int[] ids = createPointOfInterest(thisLocationLatitude, thisLocationLongitude, thisLocationName, attendees);
+
+                    for (int thisId : ids) {
+                        graphicIdToDBRef.put(thisId, location);
+                    }
                 }
 
             }
@@ -88,6 +104,26 @@ public class MapActivity extends Activity {
 
         //createPointOfInterest(41.3163, -72.9223, "Placeholder", 5);
 
+        mMapView.setOnSingleTapListener(new OnSingleTapListener() {
+            @Override
+            public void onSingleTap(float x, float y) {
+                if (!mMapView.isLoaded()) {
+                    return;
+                }
+
+                //Point identifyPoint = mMapView.toMapPoint(x, y);
+
+                int thisPointId = graphicsLayer.getGraphicIDs(x, y, 200, 1)[0];
+                Log.d("result", "" + thisPointId);
+
+                String text = graphicIdToDBRef.get(thisPointId).child("name").getValue().toString();
+
+                Context context = getApplicationContext();
+                Toast toast = Toast.makeText(context, text, LENGTH_SHORT);
+                toast.show();
+
+            }
+        });
     }
 
 
@@ -110,21 +146,26 @@ public class MapActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
-    protected void createPointOfInterest(Double latitude, Double longitude, String description, int population) {
+    protected int[] createPointOfInterest(Double latitude, Double longitude, String description, int population) {
+        int[] ids = new int[2];
+
         Log.d("POI", "entered point of interest creator");
         Point pnt = GeometryEngine.project(longitude, latitude, webSR);
 
         SimpleMarkerSymbol sms = new SimpleMarkerSymbol(Color.RED, 40, SimpleMarkerSymbol.STYLE.CIRCLE);
         Graphic graphic = new Graphic(pnt, sms);
-        graphicsLayer.addGraphic(graphic);
+        ids[0] = graphicsLayer.addGraphic(graphic);
+
 
         TextSymbol textSymbol = new TextSymbol(30, Integer.toString(population), Color.WHITE, HorizontalAlignment.CENTER, VerticalAlignment.MIDDLE);
         Graphic textGraphic = new Graphic(pnt, textSymbol);
-        graphicsLayer.addGraphic(textGraphic);
+        ids[1] = graphicsLayer.addGraphic(textGraphic);
 
-
-
+        return ids;
     }
+
+
+
 
 
 }
